@@ -69,13 +69,73 @@ def aggregation(w_locals, user_weights, args, attacker_idx=None):
 
         return reshape_from_oneD(selected, layer_shape_size, args)
 
-    elif args.aggregation == "GeoMed":
+    elif args.aggregation == "Norm Bound":
+
         print("Using {} aggregation".format(args.aggregation))
+
+        norm_bound = args.norm_bound
+
+        clipped_weights = []
+
+        for i in range(len(w_locals[0])):
+
+            norms = [np.linalg.norm(w[i]) for w in w_locals]
+
+            max_norm = max(norms)
+
+            if max_norm > norm_bound:
+
+                clipped_w = [w[i] * (norm_bound / max_norm) for w in w_locals]
+
+            else:
+
+                clipped_w = [w[i] for w in w_locals]
+
+            clipped_weights.append(clipped_w)
+
+        averaged_weight = np.mean(clipped_weights, axis=0)
+
+        return reshape_from_oneD(averaged_weight, layer_shape_size, args)
+
+    elif args.aggregation == "GeoMed":
+
+        print("Using {} aggregation".format(args.aggregation))
+
         user_one_d = np.array(user_one_d).astype(float)
 
         selected = np.asarray(hdm.geomedian(user_one_d, axis=0))
 
         return reshape_from_oneD(selected, layer_shape_size, args)
+
+    elif args.aggregation == "median":
+
+        print("Using {} aggregation".format(args.aggregation))
+
+        gradients = np.array(w_locals)
+
+        median = np.median(gradients, axis=0)
+
+        return median
+
+    elif args.aggregation == "trimmed_mean":
+
+        print("Using {} aggregation".format(args.aggregation))
+
+        num_machines = len(w_locals)
+
+        gradients = np.array(w_locals)
+
+        beta = args.beta
+
+        k = int(np.ceil(beta * num_machines))
+
+        indices = np.argsort(np.linalg.norm(gradients - np.median(gradients, axis=0), axis=1))
+        
+        trimmed_gradients = gradients[indices[k:-k]]
+
+        trimmed_mean = np.mean(trimmed_gradients, axis=0)
+
+        return trimmed_mean
 
     elif args.aggregation == "atten":
         # this is our method
